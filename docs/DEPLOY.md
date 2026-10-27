@@ -9,7 +9,7 @@
 ## Install en ligne
 
 ```bash
-git clone https://github.com/<user>/uccx-portal.git
+git clone https://github.com/vincent051/uccx-portal.git
 cd uccx-portal
 cp .env.example .env
 # Éditer au minimum :

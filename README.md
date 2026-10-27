@@ -10,7 +10,7 @@ Portail web (Docker) pour piloter les paramètres des scripts UCCX : horaires, f
 ## Démarrage rapide
 
 ```bash
-git clone https://github.com/<user>/uccx-portal.git
+git clone https://github.com/vincent051/uccx-portal.git
 cd uccx-portal
 cp .env.example .env   # éditer PORTAL_HOST, mots de passe, UCCX_*
 ./portal.sh install

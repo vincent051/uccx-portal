@@ -1,4 +1,4 @@
-"""Synchronise le XML vers UCCX Document Management + upload prompts."""
+"""Upload prompts et gestion Document/Prompt UCCX Admin API."""
 
 from __future__ import annotations
 
@@ -17,113 +17,6 @@ _LANG_FOLDER_RE = re.compile(r"^[A-Za-z]{2,3}(_[A-Za-z0-9]+)?$")
 
 def _base_url(settings: Settings) -> str:
     return f"https://{settings.uccx_host}/adminapi"
-
-
-def _lang_folder(settings: Settings) -> str:
-    # Sur cet UCCX la racine documents contient en, fr, default…
-    return (settings.uccx_document_folder or "en").strip("/\\") or "en"
-
-
-def _doc_filename(app_name: str) -> str:
-    # Fichier plat sous /en/ (les chemins imbriqués échouent à l'upload sur cet UCCX)
-    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in app_name)
-    return f"{safe}_config.xml"
-
-
-def remote_doc_path(settings: Settings, app_name: str) -> str:
-    return f"{_lang_folder(settings)}/{_doc_filename(app_name)}"
-
-
-def _ensure_file_node(client: httpx.Client, settings: Settings, app_name: str) -> None:
-    """Crée l'entrée Document/File si absente (POST /adminapi/document)."""
-    lang = _lang_folder(settings)
-    fname = _doc_filename(app_name)
-    list_url = f"{_base_url(settings)}/document/{lang}"
-    listed = client.get(list_url, headers={"Accept": "application/xml"})
-    if listed.status_code == 200 and fname in listed.text:
-        return
-    meta = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        "<Files><Document><File>"
-        f"<path>/{lang}/</path><FileName>{fname}</FileName>"
-        "</File></Document></Files>"
-    )
-    resp = client.post(
-        f"{_base_url(settings)}/document",
-        content=meta.encode("utf-8"),
-        headers={"Accept": "application/xml", "Content-Type": "application/xml"},
-    )
-    if resp.status_code not in (200, 201, 204):
-        logger.warning("ensure file node: %s %s", resp.status_code, resp.text[:200])
-
-
-def sync_document(settings: Settings, app_name: str, xml_path: Path) -> tuple[bool, str]:
-    """Upload/replace config XML dans Document Management.
-
-    Endpoint réel (WADL) : POST /adminapi/document/uploadFile (multipart field **file**).
-    """
-    if not settings.uccx_sync_enabled:
-        return True, "sync désactivée"
-    if not settings.uccx_user or not settings.uccx_password:
-        return False, "UCCX_USER / UCCX_PASSWORD non configurés"
-
-    content = xml_path.read_bytes()
-    fname = _doc_filename(app_name)
-    remote = remote_doc_path(settings, app_name)
-    upload_url = f"{_base_url(settings)}/document/uploadFile"
-
-    try:
-        with httpx.Client(verify=settings.uccx_verify_ssl, timeout=30.0) as client:
-            client.auth = (settings.uccx_user, settings.uccx_password)
-            _ensure_file_node(client, settings, app_name)
-            response = client.post(
-                upload_url,
-                files={"file": (fname, content, "text/xml")},
-                headers={"Accept": "application/xml"},
-            )
-            # #region agent log
-            try:
-                import json
-                import urllib.request
-
-                urllib.request.urlopen(
-                    urllib.request.Request(
-                        "http://172.18.0.1:7898/ingest/cdc6bc96-7ebb-404a-8508-afc2eafba158",
-                        data=json.dumps(
-                            {
-                                "sessionId": "03680a",
-                                "hypothesisId": "H4",
-                                "location": "uccx_sync.py:sync_document",
-                                "message": "uploadFile result",
-                                "data": {
-                                    "status": response.status_code,
-                                    "remote": remote,
-                                    "bytes": len(content),
-                                    "body": response.text[:200],
-                                },
-                                "timestamp": __import__("time").time() * 1000,
-                                "runId": "post-fix",
-                            }
-                        ).encode(),
-                        headers={
-                            "Content-Type": "application/json",
-                            "X-Debug-Session-Id": "03680a",
-                        },
-                        method="POST",
-                    ),
-                    timeout=1,
-                )
-            except Exception:
-                pass
-            # #endregion
-            if response.status_code in (200, 201, 204):
-                return True, f"OK uploadFile → DOC[{remote.replace('/', chr(92))}]"
-            detail = f"uploadFile {response.status_code}: {response.text[:400]}"
-            logger.warning("Sync document échouée: %s", detail)
-            return False, detail
-    except httpx.HTTPError as exc:
-        logger.exception("Erreur réseau sync UCCX")
-        return False, str(exc)
 
 
 def _prompt_client(settings: Settings) -> httpx.Client:

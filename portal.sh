@@ -77,13 +77,11 @@ ensure_env() {
 }
 
 ensure_dirs() {
-  mkdir -p data/xml data/piper data/kokoro data/whisper letsencrypt dist
+  mkdir -p data/piper data/kokoro data/whisper letsencrypt dist
   if [[ ! -f letsencrypt/acme.json ]]; then
     touch letsencrypt/acme.json
   fi
   chmod 600 letsencrypt/acme.json 2>/dev/null || true
-  # gitkeep placeholders
-  touch data/xml/.gitkeep 2>/dev/null || true
 }
 
 wait_health() {
@@ -266,8 +264,8 @@ cmd_export_offline() {
       tar -C "$ROOT/data" -cf - "$d" | tar -C "$work/bundle/data" -xf -
     fi
   done
-  mkdir -p "$work/bundle/letsencrypt" "$work/bundle/data/xml"
-  touch "$work/bundle/letsencrypt/acme.json" "$work/bundle/data/xml/.gitkeep"
+  mkdir -p "$work/bundle/letsencrypt" "$work/bundle/data"
+  touch "$work/bundle/letsencrypt/acme.json"
   printf '%s\n' "$api_img" >"$work/bundle/API_IMAGE.txt"
   local out="dist/uccx-portal-offline-${stamp}.tar.gz"
   mkdir -p dist
@@ -304,7 +302,7 @@ cmd_import_offline() {
     mkdir -p "$ROOT/docs"
     cp -a "$src/docs/." "$ROOT/docs/"
   fi
-  for d in piper kokoro whisper xml; do
+  for d in piper kokoro whisper; do
     if [[ -d "$src/data/$d" ]]; then
       mkdir -p "$ROOT/data/$d"
       cp -a "$src/data/$d/." "$ROOT/data/$d/"

@@ -12,12 +12,11 @@ __pycache__/
 
 # Runtime data
 data/*.db
-data/xml/**/*.xml
-!data/xml/.gitkeep
 data/piper/
 data/kokoro/
 data/whisper/
 data/portal_tts.json
+data/xml/
 
 # TLS / basic auth generated
 letsencrypt/acme.json

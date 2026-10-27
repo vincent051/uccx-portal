@@ -1,12 +1,9 @@
 import asyncio
 import time
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, Response
-from fastapi.responses import FileResponse
 
 from app.agent_debug_log import agent_debug_log
-from app.config import get_settings
 from app.db import SessionLocal
 from app.piper_tts import (
     TtsError,
@@ -77,27 +74,6 @@ async def parse_tts_input(
     if not text:
         raise HTTPException(400, "Texte vide")
     return text, lang, voice, engine
-
-
-@router.get("/apps/{app_name}/config.xml")
-def get_public_xml(app_name: str):
-    """Endpoint consommé par UCCX (Create URL Document). Sans auth.
-
-    Sécuriser éventuellement via firewall (IP UCCX uniquement).
-    """
-    settings = get_settings()
-    # Empêche path traversal
-    if "/" in app_name or "\\" in app_name or ".." in app_name:
-        raise HTTPException(400, "Nom d'application invalide")
-    path = Path(settings.xml_dir) / app_name / "config.xml"
-    if not path.is_file():
-        raise HTTPException(404, f"config.xml introuvable pour {app_name}")
-    return FileResponse(
-        path,
-        media_type="application/xml",
-        filename="config.xml",
-        headers={"Cache-Control": "no-store"},
-    )
 
 
 @router.post("/tts")

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     admin_user: str = "admin"
     admin_password: str = "admin"
     database_url: str = "sqlite:////tmp/uccx_portal.db"
-    xml_dir: str = "/home/deepadm/uccx-portal/data/xml"
+    data_dir: str = "/data"
     access_token_expire_minutes: int = 480
 
     uccx_host: str = "172.27.200.7"

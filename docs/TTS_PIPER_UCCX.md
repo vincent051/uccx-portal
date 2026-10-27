@@ -11,7 +11,7 @@ http://<IP-Windows-sur-le-LAN>:8080/api/public/tts
 Exemple si le PC Windows est `172.27.200.10` :  
 `http://172.27.200.10:8080/api/public/tts`
 
-Le portail reste en HTTPS pour les humains (`https://collab-edge.i-hub.com`).  
+Le portail reste en HTTPS pour les humains (`https://$PORTAL_HOST`).  
 Prérequis Windows/WSL : `./scripts/windows-expose-ports.ps1` (admin) pour le **portproxy 8080**.
 
 Réponse : **corps binaire** `Content-Type: audio/wav` (G.711 µ-law, 8 kHz, mono).

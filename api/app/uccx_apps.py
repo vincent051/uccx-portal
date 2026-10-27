@@ -13,8 +13,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
-from app.models import AppConfig, Application
-from app.xml_gen import default_payload, write_config_xml
+from app.models import Application
 
 logger = logging.getLogger(__name__)
 
@@ -529,9 +528,6 @@ def application_to_dict(detail: ApplicationDetail) -> dict[str, Any]:
 
 def sync_applications_from_uccx(db: Session, settings: Settings | None = None) -> dict:
     """Upsert les apps UCCX en base et purge les apps locales absentes d'UCCX."""
-    import shutil
-    from pathlib import Path
-
     settings = settings or get_settings()
     remote = list_uccx_applications(settings)
     imported: list[str] = []
@@ -559,23 +555,16 @@ def sync_applications_from_uccx(db: Session, settings: Settings | None = None) -
         app = Application(name=remote_app.name, description=(desc or "")[:255])
         db.add(app)
         db.flush()
-        payload = default_payload()
-        db.add(AppConfig(application_id=app.id, payload_json=payload.model_dump_json()))
-        write_config_xml(settings.xml_dir, app.name, payload)
         imported.append(remote_app.name)
 
     # Purge apps locales qui n'existent plus (ou jamais) sur UCCX
     locals_apps = db.query(Application).all()
-    xml_root = Path(settings.xml_dir)
     for local in locals_apps:
         if local.name in remote_script_names:
             continue
         name = local.name
         db.delete(local)
         removed.append(name)
-        app_xml_dir = xml_root / name
-        if app_xml_dir.is_dir():
-            shutil.rmtree(app_xml_dir, ignore_errors=True)
 
     db.commit()
     logger.info(

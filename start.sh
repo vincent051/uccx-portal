@@ -14,9 +14,9 @@ set -a
 set +a
 
 export DATABASE_URL="${DATABASE_URL:-sqlite:////home/deepadm/uccx-portal/data/portal.db}"
-export XML_DIR="${XML_DIR:-$ROOT/data/xml}"
+export DATA_DIR="${DATA_DIR:-$ROOT/data}"
 export PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-http://127.0.0.1:8080}"
 
-mkdir -p "$XML_DIR" data
+mkdir -p "$DATA_DIR"
 cd api
 exec ../.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8080}"

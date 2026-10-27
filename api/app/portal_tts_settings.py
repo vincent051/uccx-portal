@@ -27,8 +27,7 @@ _SETTINGS_NAME = "portal_tts.json"
 
 def _settings_path(settings: Settings | None = None) -> Path:
     settings = settings or get_settings()
-    # XML_DIR = /data/xml → parent /data
-    return Path(settings.xml_dir).resolve().parent / _SETTINGS_NAME
+    return Path(settings.data_dir).resolve() / _SETTINGS_NAME
 
 
 def read_stored_engine(settings: Settings | None = None) -> str | None:

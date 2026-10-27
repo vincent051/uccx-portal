@@ -1,11 +1,16 @@
 # UCCX Portal
 
-Portail web (Docker) pour piloter les paramètres des scripts UCCX : horaires, fériés, prompts TTS/STT, SkillsManager, SSO SAML, admin users.
+Portail web Docker pour administrer les applications Cisco UCCX : paramètres AppAdmin, calendriers, prompts (TTS/STT), SkillsManager, SSO SAML et gestion des utilisateurs.
 
-- **Mode A** : UCCX lit un XML HTTP servi par ce portail
-- **Failover** : sync Document Management UCCX à chaque save
-- **RBAC** : accès par application / teams Skills
-- **Traefik** : HTTPS Let's Encrypt + basic auth
+## Fonctionnalités
+
+- **Applications** — import depuis UCCX, édition des script params, calendriers `CCCalendar`, prompts Playable
+- **Prompts** — upload µ-law, TTS (Piper / Kokoro / Edge / ElevenLabs), STT Whisper
+- **SkillsManager** — compétences agents, templates, planifications
+- **Admin** — utilisateurs (droits, mot de passe local, RunAs), settings chiffrés, SSO
+- **Traefik** — HTTPS (Let's Encrypt), basic auth site ; API JWT via `X-UCCX-Token`
+
+Les horaires et fériés se gèrent via les **calendriers UCCX natifs** (API Admin), pas via un fichier XML servi par le portail.
 
 ## Démarrage rapide
 
@@ -17,37 +22,40 @@ cp .env.example .env   # éditer PORTAL_HOST, mots de passe, UCCX_*
 ./portal.sh doctor
 ```
 
-Mise à jour :
-
 ```bash
-./portal.sh update
+./portal.sh update          # mise à jour
+./portal.sh export-offline  # bundle air-gap
+./portal.sh import-offline FILE
 ```
 
-Déploiement détaillé (online, offline, Post assets, certificats) : **[docs/DEPLOY.md](docs/DEPLOY.md)**.
+Guide complet : **[docs/DEPLOY.md](docs/DEPLOY.md)**.
 
 | Commande | Rôle |
 |----------|------|
 | `./portal.sh install` | Première install |
 | `./portal.sh update` | Pull + rebuild |
 | `./portal.sh status` / `doctor` / `logs` | Ops |
-| `./portal.sh export-offline` | Bundle air-gap |
-| `./portal.sh import-offline FILE` | Restore air-gap |
+| `./portal.sh export-offline` / `import-offline` | Déploiement hors ligne |
 
-## Docker / WSL
+## Auth
 
-```bash
-./scripts/ensure-docker.sh   # démon + ACL docker.sock
-```
+| Couche | Mécanisme |
+|--------|-----------|
+| Traefik (UI `/`) | Basic auth (`BASIC_AUTH_*` ou `ADMIN_*`) |
+| API applicative | JWT dans le header **`X-UCCX-Token`** (pas `Authorization: Bearer`) |
+| Opérateurs | SSO SAML si configuré ([docs/SAML_SSO.md](docs/SAML_SSO.md)) |
+| Admin break-glass | Login local (formulaire replié si SSO actif) |
 
-### Accès local
+## Accès
 
 | URL | Auth |
 |-----|------|
-| https://127.0.0.1/api/public/health | aucune → `ok` |
-| https://127.0.0.1/ | basic auth puis login portail |
-| https://`$PORTAL_HOST`/ | idem + Let's Encrypt si DNS/80/443 OK |
+| `https://$PORTAL_HOST/` | Basic + login portail |
+| `https://127.0.0.1/` | Idem (cert auto-signé) |
+| `https://…/api/public/health` | Aucune → `ok` |
+| `http://<IP-LAN>:8080/api/public/tts` | Allowlist IP — TTS pour scripts UCCX |
 
-### Assets UI Post (optionnel)
+Assets UI Post (optionnel) :
 
 ```bash
 cp docker-compose.post-assets.yml.example docker-compose.post-assets.yml
@@ -55,24 +63,14 @@ cp docker-compose.post-assets.yml.example docker-compose.post-assets.yml
 ./portal.sh update
 ```
 
-### Mots de passe
-
-Éditer `.env` (`ADMIN_PASSWORD`, `BASIC_AUTH_PASSWORD`) puis :
-
-```bash
-docker compose down && ./portal.sh update
-```
-
-`auth-init` régénère `letsencrypt/htpasswd` à chaque `compose up`.
-
 ## Dev sans Docker
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r api/requirements.txt
-mkdir -p data/xml
+mkdir -p data
 export DATABASE_URL=sqlite:////$(pwd)/data/portal.db
-export XML_DIR=$(pwd)/data/xml
+export DATA_DIR=$(pwd)/data
 export PUBLIC_BASE_URL=http://127.0.0.1:8080
 ./start.sh
 ```
@@ -81,8 +79,7 @@ export PUBLIC_BASE_URL=http://127.0.0.1:8080
 
 | Doc | Contenu |
 |-----|---------|
-| [docs/DEPLOY.md](docs/DEPLOY.md) | Install / update / offline |
-| [docs/SCRIPT_FAILOVER.md](docs/SCRIPT_FAILOVER.md) | Config UCCX |
-| [docs/SAML_SSO.md](docs/SAML_SSO.md) | SSO |
-| [docs/TTS_PIPER_UCCX.md](docs/TTS_PIPER_UCCX.md) | TTS public |
-| [AGENTS.md](AGENTS.md) | Architecture pour agents |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | Install, update, offline, certificats |
+| [docs/SAML_SSO.md](docs/SAML_SSO.md) | SSO opérateurs |
+| [docs/TTS_PIPER_UCCX.md](docs/TTS_PIPER_UCCX.md) | TTS public pour scripts UCCX |
+| [AGENTS.md](AGENTS.md) | Architecture API (agents / contributeurs) |

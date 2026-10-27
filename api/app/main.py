@@ -31,7 +31,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
-Path(settings.xml_dir).mkdir(parents=True, exist_ok=True)
+Path(settings.data_dir).mkdir(parents=True, exist_ok=True)
 
 
 async def _holiday_roll_loop() -> None:
@@ -88,7 +88,7 @@ async def lifespan(_app: FastAPI):
         ensure_admin(db, settings)
     finally:
         db.close()
-    logger.info("UCCX Portal prêt — XML dir=%s", settings.xml_dir)
+    logger.info("UCCX Portal prêt — data dir=%s", settings.data_dir)
     try:
         from app.tts_engine import warmup_engines
 

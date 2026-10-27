@@ -65,29 +65,6 @@ class Application(Base):
     users = relationship(
         "User", secondary=user_applications, back_populates="applications"
     )
-    config = relationship(
-        "AppConfig",
-        back_populates="application",
-        uselist=False,
-        cascade="all, delete-orphan",
-    )
-
-
-class AppConfig(Base):
-    __tablename__ = "app_configs"
-    __table_args__ = (UniqueConstraint("application_id"),)
-
-    id = Column(Integer, primary_key=True)
-    application_id = Column(
-        Integer, ForeignKey("applications.id", ondelete="CASCADE"), nullable=False
-    )
-    payload_json = Column(Text, nullable=False, default="{}")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    last_sync_at = Column(DateTime, nullable=True)
-    last_sync_status = Column(String(64), default="never")
-    last_sync_error = Column(Text, default="")
-
-    application = relationship("Application", back_populates="config")
 
 
 class PromptTranscript(Base):

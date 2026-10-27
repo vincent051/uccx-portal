@@ -123,7 +123,7 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+psycopg2://uccx:uccx@db:5432/uccx_portal
-      XML_DIR: /data/xml
+      DATA_DIR: /data
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://${PORTAL_HOST}}
     volumes:
       - ./data:/data

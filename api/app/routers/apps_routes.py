@@ -1,6 +1,5 @@
 import logging
 import re
-from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -21,7 +20,7 @@ from app.audio_convert import (
 from app.auth import get_accessible_app, get_current_user
 from app.config import get_settings
 from app.db import SessionLocal, get_db
-from app.models import AppConfig, Application, User
+from app.models import Application, User
 from app.piper_tts import TtsError
 from app.secure_settings import get_effective_settings
 from app.prompt_transcripts import (
@@ -36,8 +35,7 @@ from app.prompt_transcripts import (
     transcripts_for_app,
     upsert_transcript,
 )
-from app.schemas import AppConfigOut, AppConfigPayload, ApplicationOut
-from app.seed import load_payload
+from app.schemas import ApplicationOut
 from app.tts_engine import (
     list_engines,
     list_voices,
@@ -66,10 +64,8 @@ from app.uccx_sync import (
     prompt_file_exists,
     relpath_to_playable,
     resolve_upload_targets,
-    sync_document,
     upload_prompt_to_lang,
 )
-from app.xml_gen import write_config_xml
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/apps", tags=["apps"])
@@ -126,31 +122,6 @@ class PromptSttSettingsBody(BaseModel):
     lang: str
     stt_enabled: bool
     relpath: str = ""
-
-
-def _ensure_config(db: Session, application: Application) -> AppConfig:
-    if application.config:
-        return application.config
-    from app.xml_gen import default_payload
-
-    payload = default_payload()
-    cfg = AppConfig(application_id=application.id, payload_json=payload.model_dump_json())
-    db.add(cfg)
-    db.commit()
-    db.refresh(application)
-    return application.config
-
-
-def _to_out(app: Application, cfg: AppConfig, settings) -> AppConfigOut:
-    return AppConfigOut(
-        application=app.name,
-        config=load_payload(cfg),
-        updated_at=cfg.updated_at,
-        last_sync_at=cfg.last_sync_at,
-        last_sync_status=cfg.last_sync_status or "never",
-        last_sync_error=cfg.last_sync_error or "",
-        public_xml_url=f"{settings.public_base_url.rstrip('/')}/api/public/apps/{app.name}/config.xml",
-    )
 
 
 @router.get("", response_model=list[ApplicationOut])
@@ -269,41 +240,6 @@ def put_uccx_calendar(
 
     cal.pop("raw_xml", None)
     return cal
-
-
-@router.get("/{app_name}/config", response_model=AppConfigOut)
-def get_config(
-    app_name: str,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    settings = get_settings()
-    app = get_accessible_app(db, user, app_name)
-    cfg = _ensure_config(db, app)
-    return _to_out(app, cfg, settings)
-
-
-@router.put("/{app_name}/config", response_model=AppConfigOut)
-def put_config(
-    app_name: str,
-    body: AppConfigPayload,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    settings = get_settings()
-    app = get_accessible_app(db, user, app_name)
-    cfg = _ensure_config(db, app)
-    cfg.payload_json = body.model_dump_json()
-    cfg.updated_at = datetime.utcnow()
-
-    xml_path = write_config_xml(settings.xml_dir, app.name, body)
-    ok, msg = sync_document(settings, app.name, xml_path)
-    cfg.last_sync_at = datetime.utcnow()
-    cfg.last_sync_status = "ok" if ok else "error"
-    cfg.last_sync_error = "" if ok else msg
-    db.commit()
-    db.refresh(cfg)
-    return _to_out(app, cfg, settings)
 
 
 def _get_playable_or_400(app_name: str, param_name: str, settings):

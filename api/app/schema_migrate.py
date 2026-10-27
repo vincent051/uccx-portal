@@ -19,6 +19,12 @@ def ensure_portal_schema(engine: Engine) -> None:
         elif dialect == "postgresql":
             _pg_user_cols(conn)
             _pg_skill_schedule_cols(conn)
+        # Legacy Mode A / config.xml — plus utilisé
+        try:
+            conn.execute(text("DROP TABLE IF EXISTS app_configs"))
+            logger.info("table app_configs supprimée (legacy config.xml)")
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("drop app_configs skip: %s", exc)
         # Tables nouvelles créées via Base.metadata.create_all
 
 

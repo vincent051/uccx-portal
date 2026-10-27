@@ -1,5 +1,13 @@
 # Déploiement UCCX Portal
 
+## Architecture
+
+Stack Docker : **Traefik** (HTTPS + basic auth) → **API FastAPI** → **Postgres**.
+
+Le portail pousse les changements vers UCCX via l’**Admin API** (applications, calendriers, prompts). Il ne sert pas de `config.xml` public pour les scripts (horaires = calendriers UCCX).
+
+L’endpoint public utile pour UCCX est surtout `POST /api/public/tts` (HTTP :8080). Voir [TTS_PIPER_UCCX.md](TTS_PIPER_UCCX.md).
+
 ## Prérequis
 
 - Docker Engine + plugin Compose v2
@@ -69,8 +77,6 @@ Le bundle contient : images Docker (`api`, `postgres`, `traefik`, `httpd`), code
 
 ```bash
 # Docker déjà installé (paquets offline)
-tar xzf uccx-portal-offline-YYYYMMDD.tar.gz
-cd bundle   # ou copier le contenu vers le répertoire cible
 ./portal.sh import-offline /chemin/uccx-portal-offline-YYYYMMDD.tar.gz
 ```
 

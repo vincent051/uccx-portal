@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
-ENV XML_DIR=/data/xml
+ENV DATA_DIR=/data
 ENV DATABASE_URL=sqlite:////data/portal.db
 ENV PIPER_BIN=/usr/local/bin/piper
 ENV PIPER_MODEL=/data/piper/fr_FR-siwis-medium.onnx

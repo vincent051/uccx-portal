@@ -1,14 +1,16 @@
 # SSO SAML — UCCX Portal
 
-Avec **SSO activé sur CUCM/UCCX**, l’auth mot de passe via AXL `doAuthenticateUser` (ancien SkillsManager PHP) ne fonctionne plus pour les end-users. Le portail agit comme **Service Provider SAML 2.0** vers le **même IdP** (Cisco IdS, Azure AD, ADFS…).
+Le portail agit comme **Service Provider SAML 2.0** vers l’IdP d’entreprise (Cisco IdS, Azure AD, ADFS…). Avec SSO CUCM/UCCX, l’auth mot de passe AXL end-user n’est en général plus disponible : les opérateurs se connectent via SSO.
+
+Le parcours nominal UI = bouton **Connexion SSO** ; le formulaire **Admin local** reste en break-glass.
 
 ## Flux
 
-1. Bouton **Connexion SSO** → `GET /api/auth/saml/login` → redirect IdP  
-2. IdP POST l’assertion vers **ACS** : `{PUBLIC_BASE_URL}/api/auth/saml/acs`  
-3. Le portail extrait le `userid`, vérifie que l’utilisateur existe en base (sync UCCX), émet un JWT  
+1. Bouton **Connexion SSO** → `GET /api/auth/saml/login` → redirect IdP
+2. IdP POST l’assertion vers **ACS** : `{PUBLIC_BASE_URL}/api/auth/saml/acs`
+3. Le portail extrait le `userid`, vérifie que l’utilisateur existe en base (sync UCCX), émet un JWT (`X-UCCX-Token`)
 
-Compte **admin local** (break-glass) : formulaire « Admin local » → `POST /api/auth/login`.
+Compte **admin local** : formulaire « Admin local (break-glass) » → `POST /api/auth/login`.
 
 L’API Admin UCCX (`UCCX_USER` / `UCCX_PASSWORD`) reste en Basic Auth application — **indépendante** du SSO end-user.
 

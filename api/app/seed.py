@@ -1,11 +1,10 @@
-import json
 import logging
 
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password, verify_password
 from app.config import Settings
-from app.models import AppConfig, User
+from app.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +39,3 @@ def ensure_admin(db: Session, settings: Settings) -> None:
     db.add(admin)
     db.commit()
     logger.info("Utilisateur admin créé: %s", settings.admin_user)
-
-
-def load_payload(cfg: AppConfig):
-    from app.schemas import AppConfigPayload
-
-    return AppConfigPayload.model_validate(json.loads(cfg.payload_json))

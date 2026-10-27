@@ -1,0 +1,16 @@
+# Optional Post / UCCX public assets (css, fonts, img, js).
+# Copy to docker-compose.post-assets.yml and set UCCX_PUBLIC_DIR in .env, then:
+#
+#   cp docker-compose.post-assets.yml.example docker-compose.post-assets.yml
+#   # in .env: UCCX_PUBLIC_DIR=/path/to/uccx/public
+#   docker compose -f docker-compose.yml -f docker-compose.post-assets.yml up -d
+#
+# Or: ./portal.sh install   # auto-detects docker-compose.post-assets.yml
+
+services:
+  api:
+    volumes:
+      - ${UCCX_PUBLIC_DIR}/css:/app/app/static/css:ro
+      - ${UCCX_PUBLIC_DIR}/fonts:/app/app/static/fonts:ro
+      - ${UCCX_PUBLIC_DIR}/img:/app/app/static/img:ro
+      - ${UCCX_PUBLIC_DIR}/js:/app/app/static/js:ro

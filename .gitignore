@@ -1,0 +1,36 @@
+# Secrets & local env
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime data
+data/*.db
+data/xml/**/*.xml
+!data/xml/.gitkeep
+data/piper/
+data/kokoro/
+data/whisper/
+data/portal_tts.json
+
+# TLS / basic auth generated
+letsencrypt/acme.json
+letsencrypt/htpasswd
+letsencrypt/*.json
+
+# Offline bundles & local overrides
+dist/
+docker-compose.post-assets.yml
+docker-compose.override.yml
+
+# Editor / agent
+.cursor/
+*.swp
+*~
+.DS_Store

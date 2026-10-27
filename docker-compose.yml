@@ -1,0 +1,179 @@
+networks:
+  edge:
+    name: uccx_edge
+    driver: bridge
+
+services:
+  # Régénère letsencrypt/htpasswd depuis .env à chaque `compose up`
+  # (BASIC_AUTH_USER/PASSWORD, sinon ADMIN_USER/PASSWORD).
+  auth-init:
+    image: httpd:2.4-alpine
+    env_file:
+      - .env
+    environment:
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:-}
+      BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:-}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./letsencrypt:/letsencrypt
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        USER="$${BASIC_AUTH_USER:-$${ADMIN_USER:-admin}}"
+        PASS="$${BASIC_AUTH_PASSWORD:-$${ADMIN_PASSWORD}}"
+        if [ -z "$$PASS" ]; then
+          echo "ERROR: BASIC_AUTH_PASSWORD ou ADMIN_PASSWORD requis dans .env" >&2
+          exit 1
+        fi
+        mkdir -p /letsencrypt
+        htpasswd -nbB "$$USER" "$$PASS" > /letsencrypt/htpasswd
+        chmod 600 /letsencrypt/htpasswd
+        echo "htpasswd synced: user=$$USER → /letsencrypt/htpasswd"
+    restart: "no"
+    networks:
+      - edge
+
+  traefik:
+    image: traefik:v3.6
+    restart: unless-stopped
+    depends_on:
+      auth-init:
+        condition: service_completed_successfully
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+      # Docker Engine 29 exige API >= 1.40 (Traefik <=3.3 négociait 1.24)
+      DOCKER_API_VERSION: "1.44"
+    command:
+      - --log.level=INFO
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=uccx_edge
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --api.dashboard=true
+      - --api.insecure=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    networks:
+      - edge
+    labels:
+      - traefik.enable=true
+      # Dashboard Traefik (priorité haute) — chemins API Traefik ciblés pour ne pas masquer /api du portail
+      - traefik.http.routers.dashboard.rule=Host(`${PORTAL_HOST}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api/overview`) || PathPrefix(`/api/http`) || PathPrefix(`/api/tcp`) || PathPrefix(`/api/udp`) || PathPrefix(`/api/entrypoints`) || PathPrefix(`/api/version`))
+      - traefik.http.routers.dashboard.entrypoints=websecure
+      - traefik.http.routers.dashboard.tls.certresolver=le
+      - traefik.http.routers.dashboard.service=api@internal
+      - traefik.http.routers.dashboard.priority=100
+      - traefik.http.routers.dashboard.middlewares=dashboard-auth
+      # usersFile : évite l’interpolation Compose/shell des `$` du hash apr1 (sinon 401 permanent)
+      - traefik.http.middlewares.dashboard-auth.basicauth.usersfile=/letsencrypt/htpasswd
+      - traefik.http.middlewares.site-auth.basicauth.usersfile=/letsencrypt/htpasswd
+      - traefik.http.routers.dashbord-typo.rule=Host(`${PORTAL_HOST}`) && PathPrefix(`/dashbord`)
+      - traefik.http.routers.dashbord-typo.entrypoints=websecure
+      - traefik.http.routers.dashbord-typo.tls.certresolver=le
+      - traefik.http.routers.dashbord-typo.priority=110
+      - traefik.http.routers.dashbord-typo.middlewares=dashbord-redirect
+      - traefik.http.routers.dashbord-typo.service=noop@internal
+      # Dashboard via localhost (cert auto-signé Traefik — test local)
+      - traefik.http.routers.dashboard-local.rule=(Host(`localhost`) || Host(`127.0.0.1`)) && (PathPrefix(`/dashboard`) || PathPrefix(`/api/overview`) || PathPrefix(`/api/http`) || PathPrefix(`/api/tcp`) || PathPrefix(`/api/udp`) || PathPrefix(`/api/entrypoints`) || PathPrefix(`/api/version`))
+      - traefik.http.routers.dashboard-local.entrypoints=websecure
+      - traefik.http.routers.dashboard-local.tls=true
+      - traefik.http.routers.dashboard-local.service=api@internal
+      - traefik.http.routers.dashboard-local.priority=100
+      - traefik.http.routers.dashboard-local.middlewares=dashboard-auth
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: uccx
+      POSTGRES_PASSWORD: uccx
+      POSTGRES_DB: uccx_portal
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uccx -d uccx_portal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    image: uccx-portal-api:latest
+    restart: unless-stopped
+    # --reload : code monté en volume (/app/app) pris en compte sans rebuild
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+    # HTTP direct pour UCCX (Create URL Document — pas de HTTPS)
+    ports:
+      - "${UCCX_HTTP_BIND:-0.0.0.0}:${UCCX_HTTP_PORT:-8080}:8080"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://uccx:uccx@db:5432/uccx_portal
+      XML_DIR: /data/xml
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://${PORTAL_HOST}}
+    volumes:
+      - ./data:/data
+      - ./api/app:/app/app
+    depends_on:
+      db:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - edge
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.portal.loadbalancer.server.port=8080
+      # UI (/, /static) — basic auth (middleware défini sur le service traefik).
+      # /api protégé par JWT via X-UCCX-Token, sans basic auth Traefik.
+      - traefik.http.routers.portal-ui.rule=Host(`${PORTAL_HOST}`) && !PathPrefix(`/api`) && !PathPrefix(`/dashboard`) && !PathPrefix(`/dashbord`)
+      - traefik.http.routers.portal-ui.entrypoints=websecure
+      - traefik.http.routers.portal-ui.tls.certresolver=le
+      - traefik.http.routers.portal-ui.priority=10
+      - traefik.http.routers.portal-ui.middlewares=site-auth@docker
+      - traefik.http.routers.portal-ui.service=portal
+      - traefik.http.routers.portal-ui-local.rule=(Host(`localhost`) || Host(`127.0.0.1`)) && !PathPrefix(`/api`) && !PathPrefix(`/dashboard`) && !PathPrefix(`/dashbord`)
+      - traefik.http.routers.portal-ui-local.entrypoints=websecure
+      - traefik.http.routers.portal-ui-local.tls=true
+      - traefik.http.routers.portal-ui-local.priority=10
+      - traefik.http.routers.portal-ui-local.middlewares=site-auth@docker
+      - traefik.http.routers.portal-ui-local.service=portal
+      # API applicative — JWT via X-UCCX-Token, sans basic auth Traefik
+      - traefik.http.routers.portal-api.rule=Host(`${PORTAL_HOST}`) && PathPrefix(`/api`) && !PathPrefix(`/api/public`) && !PathPrefix(`/api/overview`) && !PathPrefix(`/api/http`) && !PathPrefix(`/api/tcp`) && !PathPrefix(`/api/udp`) && !PathPrefix(`/api/entrypoints`) && !PathPrefix(`/api/version`)
+      - traefik.http.routers.portal-api.entrypoints=websecure
+      - traefik.http.routers.portal-api.tls.certresolver=le
+      - traefik.http.routers.portal-api.priority=25
+      - traefik.http.routers.portal-api.service=portal
+      - traefik.http.routers.portal-api-local.rule=(Host(`localhost`) || Host(`127.0.0.1`)) && PathPrefix(`/api`) && !PathPrefix(`/api/public`) && !PathPrefix(`/api/overview`) && !PathPrefix(`/api/http`) && !PathPrefix(`/api/tcp`) && !PathPrefix(`/api/udp`) && !PathPrefix(`/api/entrypoints`) && !PathPrefix(`/api/version`)
+      - traefik.http.routers.portal-api-local.entrypoints=websecure
+      - traefik.http.routers.portal-api-local.tls=true
+      - traefik.http.routers.portal-api-local.priority=25
+      - traefik.http.routers.portal-api-local.service=portal
+      # XML public UCCX — sans auth
+      - traefik.http.routers.public-xml.rule=Host(`${PORTAL_HOST}`) && PathPrefix(`/api/public`)
+      - traefik.http.routers.public-xml.entrypoints=websecure
+      - traefik.http.routers.public-xml.tls.certresolver=le
+      - traefik.http.routers.public-xml.priority=30
+      - traefik.http.routers.public-xml.service=portal
+      - traefik.http.routers.public-xml-local.rule=(Host(`localhost`) || Host(`127.0.0.1`)) && PathPrefix(`/api/public`)
+      - traefik.http.routers.public-xml-local.entrypoints=websecure
+      - traefik.http.routers.public-xml-local.tls=true
+      - traefik.http.routers.public-xml-local.priority=30
+      - traefik.http.routers.public-xml-local.service=portal
+
+volumes:
+  pgdata:

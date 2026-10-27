@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UCCX Portal</title>
+  <link rel="stylesheet" href="/static/css/post-material.min.css" />
+  <link rel="stylesheet" href="/static/css/uc.css" />
+  <link rel="stylesheet" href="/static/css/dtsel.css" />
+  <link rel="stylesheet" href="/static/portal.css?v=44" />
+</head>
+<body>
+  <div id="login-view" class="login-page">
+    <div class="panel panel-default login-panel">
+      <div class="panel-heading">
+        <h1 class="panel-title">UCCX Portal</h1>
+      </div>
+      <div class="panel-body">
+        <p class="meta">Applications, SkillsManager, administration</p>
+        <div id="login-error" class="error hidden"></div>
+        <p id="saml-login-wrap" class="hidden" style="margin-bottom:1rem">
+          <a class="btn btn-primary" id="saml-login-btn" href="/api/auth/saml/login">Connexion SSO</a>
+        </p>
+        <details id="local-login-details">
+          <summary class="meta">Admin local (break-glass)</summary>
+          <form id="login-form" style="margin-top:0.75rem">
+            <div class="form-group">
+              <label class="control-label" for="username">Utilisateur</label>
+              <input class="form-control" id="username" name="username" autocomplete="username" />
+            </div>
+            <div class="form-group">
+              <label class="control-label" for="password">Mot de passe</label>
+              <input class="form-control" id="password" name="password" type="password" autocomplete="current-password" />
+            </div>
+            <button type="submit" class="btn btn-default">Connexion locale</button>
+          </form>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-view" class="hidden">
+    <div id="runas-banner" class="runas-banner hidden" hidden>
+      <span id="runas-banner-text">Vue en tant qu’utilisateur</span>
+      <button type="button" class="btn btn-default btn-sm" id="runas-stop-btn">Quitter RunAs</button>
+    </div>
+    <header class="portal-topbar">
+      <h1 class="brand">UCCX Portal</h1>
+      <nav class="portal-nav" id="portal-nav">
+        <button type="button" class="btn btn-default btn-sm nav-btn" data-nav="apps">Applications</button>
+        <button type="button" class="btn btn-default btn-sm nav-btn hidden" data-nav="skills">Skills</button>
+        <button type="button" class="btn btn-default btn-sm nav-btn hidden" data-nav="admin-users">Users</button>
+        <button type="button" class="btn btn-default btn-sm nav-btn hidden" data-nav="admin-settings">Settings</button>
+      </nav>
+      <div>
+        <span id="whoami" class="meta"></span>
+        <button type="button" class="btn btn-default btn-sm" id="logout-btn">Déconnexion</button>
+      </div>
+    </header>
+    <div class="portal-layout">
+      <aside class="portal-sidebar" id="apps-sidebar">
+        <h2 class="h4">Applications</h2>
+        <p id="apps-sync-msg" class="meta"></p>
+        <div id="app-list"></div>
+      </aside>
+      <main class="portal-main">
+        <!-- Apps editor -->
+        <div id="view-apps">
+          <div id="empty-state" class="panel panel-default">
+            <div class="panel-body">
+              <h2 class="h3">Sélectionnez une application</h2>
+              <p>Import automatique depuis UCCX. Édition des valeurs AppAdmin uniquement.</p>
+            </div>
+          </div>
+          <div id="editor" class="hidden">
+            <div class="panel panel-default">
+              <div class="panel-heading">
+                <h2 class="panel-title" id="app-title">Application</h2>
+              </div>
+              <div class="panel-body">
+                <p class="meta">Script : <span id="app-script"></span></p>
+                <div class="grid-meta">
+                  <div class="form-group">
+                    <label class="control-label" for="app-description">Description</label>
+                    <input class="form-control" id="app-description" type="text" />
+                  </div>
+                  <div class="form-group">
+                    <label class="control-label" for="app-maxsession">Max sessions</label>
+                    <input class="form-control" id="app-maxsession" type="number" min="0" />
+                  </div>
+                </div>
+                <div class="portal-actions">
+                  <button type="button" class="btn btn-primary" id="save-meta-btn">Enregistrer</button>
+                  <span id="meta-msg" class="meta"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel panel-default">
+              <div class="panel-heading">
+                <h3 class="panel-title">Triggers (lecture seule)</h3>
+              </div>
+              <div class="panel-body">
+                <table class="table table-striped">
+                  <thead>
+                    <tr>
+                      <th>Numéro</th>
+                      <th>Device</th>
+                      <th>Display</th>
+                      <th>Enabled</th>
+                      <th>Sessions</th>
+                      <th>Locale</th>
+                    </tr>
+                  </thead>
+                  <tbody id="triggers-body"></tbody>
+                </table>
+                <p id="triggers-empty" class="meta hidden">Aucun trigger lié.</p>
+              </div>
+            </div>
+
+            <div id="calendar-section" class="panel panel-default hidden">
+              <div class="panel-heading">
+                <h3 class="panel-title">Calendrier UCCX</h3>
+              </div>
+              <div class="panel-body">
+                <p class="meta" id="calendar-meta"></p>
+                <div class="calendar-type-row form-group">
+                  <label class="control-label" for="calendar-type">Type de calendrier</label>
+                  <select id="calendar-type" class="form-control">
+                    <option value="FULLTIME">24 Hours × 7 Days</option>
+                    <option value="FIXEDHOURS">Fixed Hours</option>
+                    <option value="FLEXIBLEHOURS">Flexible Hours</option>
+                  </select>
+                </div>
+                <div id="calendar-days"></div>
+                <h4 class="h5" style="margin-top:1rem">Jours fériés</h4>
+                <table class="table table-striped holidays-table">
+                  <thead>
+                    <tr>
+                      <th>Nom</th>
+                      <th>Type</th>
+                      <th>Date (jj/mm/aaaa)</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="calendar-holidays"></tbody>
+                </table>
+                <div class="portal-actions">
+                  <button type="button" class="btn btn-default" id="add-holiday">Ajouter férié</button>
+                  <button type="button" class="btn btn-default" id="add-lu-holidays" title="Jours fériés officiels du Luxembourg">
+                    Fériés Luxembourg
+                  </button>
+                </div>
+                <h4 class="h5" style="margin-top:1.25rem">Jours spéciaux (Custom Business Days)</h4>
+                <p class="meta">Horaires custom (max 3 plages). Récurrence annuelle / Pâques comme les fériés.</p>
+                <div id="calendar-special-days"></div>
+                <div class="portal-actions">
+                  <button type="button" class="btn btn-default" id="add-special-day">Ajouter jour spécial</button>
+                  <button type="button" class="btn btn-primary" id="save-calendar-btn">Enregistrer calendrier</button>
+                  <span id="calendar-msg" class="meta"></span>
+                </div>
+              </div>
+            </div>
+
+            <div id="prompts-section" class="panel panel-default hidden">
+              <div class="panel-heading">
+                <h3 class="panel-title">Prompts (Playable)</h3>
+              </div>
+              <div class="panel-body">
+                <p class="meta">Upload, prompts UCCX ou synthèse TTS → WAV µ-law 8 kHz mono → UCCX</p>
+                <div class="public-tts-engine-row form-group">
+                  <label class="control-label" for="public-tts-engine">Moteur TTS API UCCX
+                    <select id="public-tts-engine" class="form-control">
+                      <option value="piper">Piper</option>
+                      <option value="kokoro">Kokoro</option>
+                      <option value="edge">Edge TTS</option>
+                      <option value="elevenlabs">ElevenLabs</option>
+                    </select>
+                  </label>
+                  <span id="public-tts-engine-msg" class="meta"></span>
+                  <span id="elevenlabs-usage" class="meta elevenlabs-usage hidden" aria-live="polite"></span>
+                </div>
+                <div class="prompt-lang-add">
+                  <label class="prompt-lang-add-label" for="prompt-lang-new">Ajouter une langue UCCX
+                    <input type="text" class="form-control" id="prompt-lang-new" placeholder="ex. it_IT" maxlength="16" autocomplete="off" />
+                  </label>
+                  <button type="button" class="btn btn-default" id="add-prompt-lang-btn">Ajouter</button>
+                </div>
+                <div id="prompts-list"></div>
+                <div class="portal-actions">
+                  <button type="button" class="btn btn-primary" id="save-prompts-btn">Enregistrer prompts</button>
+                  <span id="prompts-msg" class="meta"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel panel-default">
+              <div class="panel-heading">
+                <h3 class="panel-title">Paramètres script</h3>
+              </div>
+              <div class="panel-body">
+                <table class="table table-striped">
+                  <thead>
+                    <tr><th>Nom</th><th>Type</th><th>Valeur</th></tr>
+                  </thead>
+                  <tbody id="params-body"></tbody>
+                </table>
+                <div class="portal-actions">
+                  <button type="button" class="btn btn-primary" id="save-params-btn">Enregistrer paramètres</button>
+                  <span id="params-msg" class="meta"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Skills Manager -->
+        <div id="view-skills" class="hidden">
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h2 class="panel-title">SkillsManager</h2>
+            </div>
+            <div class="panel-body">
+              <div class="skills-tabs">
+                <button type="button" class="btn btn-primary btn-sm skills-tab" data-skills-tab="matrix">Dashboard</button>
+                <button type="button" class="btn btn-default btn-sm skills-tab" data-skills-tab="templates">Templates</button>
+                <button type="button" class="btn btn-default btn-sm skills-tab" data-skills-tab="schedules">Planification</button>
+              </div>
+              <p id="skills-msg" class="meta"></p>
+
+              <div id="skills-matrix-panel">
+                <div class="portal-actions" style="margin-bottom:0.75rem">
+                  <input type="search" class="form-control" id="skills-agent-filter" placeholder="Filtrer agents…" style="max-width:220px" />
+                  <button type="button" class="btn btn-default btn-sm" id="skills-refresh-btn">Rafraîchir</button>
+                  <button type="button" class="btn btn-default btn-sm" id="skills-extras-toggle">Skills supplémentaires…</button>
+                  <button type="button" class="btn btn-primary btn-sm" id="skills-save-btn">Sauvegarder les lignes modifiées</button>
+                </div>
+                <div id="skills-extras-panel" class="skills-extras-panel hidden">
+                  <p class="meta">Colonnes masquées par défaut si niveau 0 partout. Cochez des skills du catalogue pour les afficher (ordre alphabétique).</p>
+                  <input type="search" class="form-control skills-extras-filter" id="skills-extras-filter" placeholder="Filtrer skills à ajouter…" autocomplete="off" />
+                  <div id="skills-extras-list" class="skills-extras-list"></div>
+                  <div class="portal-actions" style="margin-top:0.5rem">
+                    <button type="button" class="btn btn-primary btn-sm" id="skills-extras-apply">Appliquer</button>
+                  </div>
+                </div>
+                <div class="skills-bulk-bar" id="skills-bulk-bar">
+                  <span class="skills-bulk-count meta" id="skills-bulk-count">0 agent(s)</span>
+                  <select class="form-control skills-bulk-select" id="skills-bulk-template" aria-label="Template à appliquer"></select>
+                  <button type="button" class="btn btn-primary btn-sm" id="skills-bulk-apply">Appliquer maintenant</button>
+                  <button type="button" class="btn btn-default btn-sm" id="skills-bulk-schedule">Planifier…</button>
+                  <span class="skills-bulk-sep" aria-hidden="true"></span>
+                  <select class="form-control skills-bulk-select" id="skills-from-agent" aria-label="Agent source template"></select>
+                  <button type="button" class="btn btn-default btn-sm" id="skills-from-agent-btn">Créer template depuis</button>
+                </div>
+                <div class="skills-matrix-wrap">
+                  <table class="table table-striped skills-matrix" id="skills-matrix-table">
+                    <thead id="skills-matrix-head"></thead>
+                    <tbody id="skills-matrix-body"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div id="skills-templates-panel" class="hidden">
+                <div class="portal-actions" style="margin-bottom:0.75rem">
+                  <button type="button" class="btn btn-default btn-sm" id="template-new-btn">Nouveau template</button>
+                </div>
+                <div id="templates-list"></div>
+              </div>
+
+              <div id="skills-schedules-panel" class="hidden">
+                <div class="skills-sched-form">
+                  <div class="form-group skills-sched-agents-group">
+                    <label class="control-label" for="sched-agents">Agents</label>
+                    <select class="form-control" id="sched-agents" multiple size="6"></select>
+                    <p class="meta">Ctrl/Cmd pour multi-sélection. Heures en Europe/Luxembourg.</p>
+                  </div>
+                  <div class="grid-meta">
+                    <div class="form-group">
+                      <label class="control-label" for="sched-old">Template hors créneau (Old)</label>
+                      <select class="form-control" id="sched-old"></select>
+                    </div>
+                    <div class="form-group">
+                      <label class="control-label" for="sched-new">Template dans créneau (New)</label>
+                      <select class="form-control" id="sched-new"></select>
+                    </div>
+                  </div>
+                  <div class="skills-sched-kind" role="radiogroup" aria-label="Mode planification">
+                    <label class="skills-sched-kind-opt">
+                      <input type="radio" name="sched-kind" value="once" id="sched-kind-once" />
+                      <span>Une fois (fenêtre)</span>
+                    </label>
+                    <label class="skills-sched-kind-opt">
+                      <input type="radio" name="sched-kind" value="recurring" id="sched-kind-recurring" checked />
+                      <span>Créneau récurrent</span>
+                    </label>
+                  </div>
+                  <div id="sched-once-fields" class="grid-meta hidden">
+                    <div class="form-group">
+                      <label class="control-label" for="sched-start">Début</label>
+                      <input class="form-control" id="sched-start" type="datetime-local" />
+                    </div>
+                    <div class="form-group">
+                      <label class="control-label" for="sched-end">Fin</label>
+                      <input class="form-control" id="sched-end" type="datetime-local" />
+                    </div>
+                  </div>
+                  <div id="sched-recur-fields" class="skills-sched-recur">
+                    <div class="form-group">
+                      <span class="control-label">Jours</span>
+                      <div class="skills-dow" id="sched-dow" role="group" aria-label="Jours de la semaine">
+                        <button type="button" class="skills-dow-btn is-on" data-dow="1" aria-pressed="true">Lun</button>
+                        <button type="button" class="skills-dow-btn is-on" data-dow="2" aria-pressed="true">Mar</button>
+                        <button type="button" class="skills-dow-btn is-on" data-dow="3" aria-pressed="true">Mer</button>
+                        <button type="button" class="skills-dow-btn is-on" data-dow="4" aria-pressed="true">Jeu</button>
+                        <button type="button" class="skills-dow-btn is-on" data-dow="5" aria-pressed="true">Ven</button>
+                        <button type="button" class="skills-dow-btn" data-dow="6" aria-pressed="false">Sam</button>
+                        <button type="button" class="skills-dow-btn" data-dow="7" aria-pressed="false">Dim</button>
+                      </div>
+                    </div>
+                    <div class="grid-meta">
+                      <div class="form-group">
+                        <label class="control-label" for="sched-time-start">Heure début</label>
+                        <input class="form-control" id="sched-time-start" type="time" value="09:00" />
+                      </div>
+                      <div class="form-group">
+                        <label class="control-label" for="sched-time-end">Heure fin</label>
+                        <input class="form-control" id="sched-time-end" type="time" value="18:00" />
+                      </div>
+                      <div class="form-group">
+                        <label class="control-label" for="sched-valid-until">Validité jusqu’à (opt.)</label>
+                        <input class="form-control" id="sched-valid-until" type="datetime-local" />
+                      </div>
+                    </div>
+                  </div>
+                  <div class="portal-actions">
+                    <button type="button" class="btn btn-primary btn-sm" id="sched-create-btn">Enregistrer la planification</button>
+                  </div>
+                </div>
+                <div class="skills-schedules-wrap" style="margin-top:1rem">
+                  <table class="table table-striped">
+                    <thead>
+                      <tr><th>Agent</th><th>Mode</th><th>Créneau</th><th>Old → New</th><th>État</th><th></th></tr>
+                    </thead>
+                    <tbody id="schedules-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin users -->
+        <div id="view-admin-users" class="hidden">
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h2 class="panel-title">Utilisateurs</h2>
+            </div>
+            <div class="panel-body">
+              <div class="users-toolbar">
+                <div class="form-group users-filter-group">
+                  <label class="control-label sr-only" for="users-filter">Rechercher</label>
+                  <input type="search" class="form-control" id="users-filter" placeholder="Rechercher un utilisateur…" autocomplete="off" />
+                </div>
+                <div class="portal-actions users-toolbar-actions">
+                  <button type="button" class="btn btn-default btn-sm" id="users-sync-btn">Sync depuis UCCX</button>
+                  <span id="users-msg" class="meta"></span>
+                </div>
+              </div>
+              <div class="users-table-wrap">
+                <table class="table table-striped is-hoverable users-table">
+                  <thead>
+                    <tr>
+                      <th>Identifiant</th>
+                      <th>Nom</th>
+                      <th>Team UCCX</th>
+                      <th>Rôles UCCX</th>
+                      <th>Actif</th>
+                      <th>Apps</th>
+                      <th>Skills</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="users-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin settings -->
+        <div id="view-admin-settings" class="hidden">
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h2 class="panel-title">Paramètres</h2>
+            </div>
+            <div class="panel-body">
+              <p class="meta">Valeurs stockées chiffrées (Fernet). Les secrets masqués ne sont pas renvoyés.</p>
+              <div id="settings-form"></div>
+              <div class="portal-actions">
+                <button type="button" class="btn btn-primary" id="settings-save-btn">Enregistrer</button>
+                <span id="settings-msg" class="meta"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modale droits utilisateur (Deep Post) -->
+  <div id="modal-user-rights" class="portal-modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-user-rights-title" hidden>
+    <div class="portal-modal-backdrop" data-user-modal-close></div>
+    <div class="portal-modal-dialog panel panel-default">
+      <div class="panel-heading portal-modal-header">
+        <h3 class="panel-title" id="modal-user-rights-title">Droits utilisateur</h3>
+        <button type="button" class="btn btn-link btn-sm portal-modal-close" data-user-modal-close aria-label="Fermer">×</button>
+      </div>
+      <div class="panel-body portal-modal-body">
+        <input type="hidden" id="user-rights-id" value="" />
+        <section class="users-modal-section">
+          <h4 class="h5">Identité</h4>
+          <dl class="users-identity">
+            <div><dt>Identifiant</dt><dd id="user-rights-username">—</dd></div>
+            <div><dt>Nom</dt><dd id="user-rights-display">—</dd></div>
+            <div><dt>Team UCCX</dt><dd id="user-rights-team">—</dd></div>
+            <div><dt>Rôles UCCX</dt><dd id="user-rights-roles">—</dd></div>
+            <div><dt>Source</dt><dd id="user-rights-auth">—</dd></div>
+            <div><dt>Rôle portail</dt><dd id="user-rights-portal-role">—</dd></div>
+            <div>
+              <dt>Mot de passe local</dt>
+              <dd id="user-rights-pwd-badge">—</dd>
+            </div>
+          </dl>
+          <div class="users-password-row">
+            <label class="control-label" for="user-rights-password">Mot de passe local</label>
+            <div class="users-password-controls">
+              <input
+                class="form-control"
+                type="password"
+                id="user-rights-password"
+                autocomplete="new-password"
+                placeholder="Laisser vide pour ne pas changer"
+              />
+              <button type="button" class="btn btn-default btn-sm" id="user-rights-pwd-generate">
+                Générer
+              </button>
+            </div>
+            <p id="user-rights-pwd-hint" class="meta hidden">
+              À communiquer à l’utilisateur (affiché une seule fois).
+            </p>
+          </div>
+        </section>
+        <section class="users-modal-section">
+          <h4 class="h5">Accès modules</h4>
+          <div class="users-flag-row">
+            <label class="users-check-item users-flag-item">
+              <input type="checkbox" id="user-rights-active" />
+              <span>Actif</span>
+            </label>
+            <label class="users-check-item users-flag-item">
+              <input type="checkbox" id="user-rights-apps" />
+              <span>Accès Applications</span>
+            </label>
+            <label class="users-check-item users-flag-item">
+              <input type="checkbox" id="user-rights-skills" />
+              <span>Accès SkillsManager</span>
+            </label>
+          </div>
+        </section>
+        <section class="users-modal-section">
+          <h4 class="h5">Applications</h4>
+          <div class="users-check-grid" id="user-rights-apps-grid"></div>
+        </section>
+        <section class="users-modal-section">
+          <h4 class="h5">Teams Skills</h4>
+          <div class="users-check-grid" id="user-rights-teams-grid"></div>
+        </section>
+      </div>
+      <div class="portal-modal-footer">
+        <button type="button" class="btn btn-default" id="user-rights-runas-btn">RunAs</button>
+        <span class="portal-modal-footer-spacer"></span>
+        <button type="button" class="btn btn-link" data-user-modal-close>Annuler</button>
+        <button type="button" class="btn btn-primary" id="user-rights-save-btn">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/dtsel.js"></script>
+  <script src="/static/app.js?v=54"></script>
+  <script src="/static/skills-admin.js?v=13"></script>
+</body>
+</html>

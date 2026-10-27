@@ -1,0 +1,21 @@
+[
+  {"id": "fr_FR-siwis-medium", "lang_family": "fr", "label": "siwis (fr_FR, medium)", "hf_subdir": "fr/fr_FR/siwis/medium"},
+  {"id": "fr_FR-upmc-medium", "lang_family": "fr", "label": "upmc (fr_FR, medium)", "hf_subdir": "fr/fr_FR/upmc/medium"},
+  {"id": "lb_LU-marylux-medium", "lang_family": "lb", "label": "marylux (lb_LU, medium)", "hf_subdir": "lb/lb_LU/marylux/medium"},
+  {"id": "en_US-lessac-medium", "lang_family": "en", "label": "lessac (en_US, medium)", "hf_subdir": "en/en_US/lessac/medium"},
+  {"id": "en_US-amy-medium", "lang_family": "en", "label": "amy (en_US, medium)", "hf_subdir": "en/en_US/amy/medium"},
+  {"id": "en_GB-alan-medium", "lang_family": "en", "label": "alan (en_GB, medium)", "hf_subdir": "en/en_GB/alan/medium"},
+  {"id": "en_GB-alba-medium", "lang_family": "en", "label": "alba (en_GB, medium)", "hf_subdir": "en/en_GB/alba/medium"},
+  {"id": "de_DE-thorsten-medium", "lang_family": "de", "label": "thorsten (de_DE, medium)", "hf_subdir": "de/de_DE/thorsten/medium"},
+  {"id": "de_DE-kerstin-low", "lang_family": "de", "label": "kerstin (de_DE, low)", "hf_subdir": "de/de_DE/kerstin/low"},
+  {"id": "de_DE-eva_k-x_low", "lang_family": "de", "label": "eva_k (de_DE, x_low)", "hf_subdir": "de/de_DE/eva_k/x_low"},
+  {"id": "it_IT-riccardo-x_low", "lang_family": "it", "label": "riccardo (it_IT, x_low)", "hf_subdir": "it/it_IT/riccardo/x_low"},
+  {"id": "it_IT-paola-medium", "lang_family": "it", "label": "paola (it_IT, medium)", "hf_subdir": "it/it_IT/paola/medium"},
+  {"id": "es_ES-sharvard-medium", "lang_family": "es", "label": "sharvard (es_ES, medium)", "hf_subdir": "es/es_ES/sharvard/medium"},
+  {"id": "es_MX-claude-high", "lang_family": "es", "label": "claude (es_MX, high)", "hf_subdir": "es/es_MX/claude/high"},
+  {"id": "nl_NL-mls_5809-low", "lang_family": "nl", "label": "mls_5809 (nl_NL, low)", "hf_subdir": "nl/nl_NL/mls_5809/low"},
+  {"id": "nl_NL-mls_7432-low", "lang_family": "nl", "label": "mls_7432 (nl_NL, low)", "hf_subdir": "nl/nl_NL/mls_7432/low"},
+  {"id": "pt_BR-faber-medium", "lang_family": "pt", "label": "faber (pt_BR, medium)", "hf_subdir": "pt/pt_BR/faber/medium"},
+  {"id": "pl_PL-darkman-medium", "lang_family": "pl", "label": "darkman (pl_PL, medium)", "hf_subdir": "pl/pl_PL/darkman/medium"},
+  {"id": "pl_PL-gosia-medium", "lang_family": "pl", "label": "gosia (pl_PL, medium)", "hf_subdir": "pl/pl_PL/gosia/medium"}
+]
